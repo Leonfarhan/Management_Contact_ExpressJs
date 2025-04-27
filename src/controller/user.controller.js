@@ -1,14 +1,28 @@
 import sequelize from '../config/database.js';
 import User from '../models/user.model.js';
+import { dataValid } from '../validations/data.validation.js';
 
 const setUser = async (req, res, next) => {
+    const t = await sequelize.transaction();
+    const valid = {
+        name: "required",
+        email: "required,isEmail",
+        password: "required,isStrongPassword",
+    };
     try {
-        const t = await sequelize.transaction();
-        const user = req.body;
+        // const user = req.body;
+        const user = await dataValid(valid, req.body);
+        if (user.message.length > 0) {
+            return res.status(400).json({
+                errors: user.message,
+                message: "Register Field",
+                data: null,
+            });
+        }
 
         const userExists = await User.findAll({
             where: {
-                email: user.email,
+                email: user.data.email,
             },
         });
 
@@ -29,16 +43,21 @@ const setUser = async (req, res, next) => {
                 data: null,
             });
         } else {
-            User.destroy({
-                where: {
-                    email: user.email,
+            await User.destroy(
+                {
+                    where: {
+                        email: user.data.email,
+                    },
                 },
-            });
+                {
+                    transaction: t,
+                }
+            );
         }
 
         const newUser = await User.create(
             {
-                ...user,
+                ...user.data,
                 expireTime: new Date(),
             },
             {
@@ -58,6 +77,7 @@ const setUser = async (req, res, next) => {
             },
         });
     } catch (error) {
+        await t.rollback();
         next(new Error("controllers/userController.js:setUser - " + error.message));
     }
 };
