@@ -1,6 +1,6 @@
 import express from 'express';
 import userRouter from './user.routes.js';
-import { errorHandling } from '../controller/errorHandling.js';
+import { errorHandling } from '../controller/error-handling.js';
 
 const route = express.Router();
 

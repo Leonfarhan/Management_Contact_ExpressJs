@@ -1,6 +1,7 @@
 import sequelize from '../config/database.js';
 import User from '../models/user.model.js';
 import { dataValid } from '../validations/data.validation.js';
+import { sendMail } from "../utils/send-mail.js";
 
 const setUser = async (req, res, next) => {
     const t = await sequelize.transaction();
@@ -9,6 +10,7 @@ const setUser = async (req, res, next) => {
         email: "required,isEmail",
         password: "required,isStrongPassword",
     };
+
     try {
         // const user = req.body;
         const user = await dataValid(valid, req.body);
@@ -65,20 +67,30 @@ const setUser = async (req, res, next) => {
             }
         );
 
-        await t.commit();
-        res.status(201).json({
-            errors: null,
-            message: "User created successfully",
-            data: {
-                userId: newUser.userId,
-                name: newUser.name,
-                email: newUser.email,
-                expireTime: newUser.expireTime,
-            },
-        });
+        const result = await sendMail(newUser.email, newUser.userId);
+        if (!result) {
+            await t.rollback();
+            return res.status(500).json({
+                errors: ["Send email failed"],
+                message: "Register Field",
+                data: null,
+            });
+        } else {
+            await t.commit();
+            res.status(201).json({
+                errors: null,
+                message: "User created, please check your email",
+                data: {
+                    userId: newUser.userId,
+                    name: newUser.name,
+                    email: newUser.email,
+                    expireTime: newUser.expireTime,
+                },
+            });
+        }
     } catch (error) {
         await t.rollback();
-        next(new Error("controllers/userController.js:setUser - " + error.message));
+        next(new Error("controllers/user.controller.js:setUser - " + error.message));
     }
 };
 
